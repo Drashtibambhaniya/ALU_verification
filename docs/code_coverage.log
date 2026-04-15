@@ -1,0 +1,470 @@
+Coverage Report by file with details
+
+=================================================================================
+=== File: alu.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                          106        80        26      75.4
+
+================================Statement Details================================
+
+Statement Coverage for file alu.sv --
+
+    1                                                module ALU_DESIGN #(parameter DW = 8, CW = 4)(INP_VALID,OPA,OPB,CIN,CLK,RST,CMD,CE,MODE,COUT,OFLOW,RES,G,E,L,ERR);
+    2                                                //changes by MP :
+    3                                                //1. first capture the CMD, inputs A , B wrt to INP_VALID signal
+    4                                                //2. added arthimatic opertaion 9,10 - 3 cycle operation
+    5                                                //Input output port declaration
+    6                                                input [DW-1:0] OPA,OPB;
+    7                                                input CLK,RST,CE,MODE,CIN;
+    8                                                input [CW-1:0] CMD;
+    9                                                input [1:0] INP_VALID;
+    10                                               output reg [DW+1:0] RES = 8'bz;
+    11                                               output reg COUT = 1'bz;
+    12                                               output reg OFLOW = 1'bz;
+    13                                               output reg G = 1'bz;
+    14                                               output reg E = 1'bz;
+    15                                               output reg L = 1'bz;
+    16                                               output reg ERR = 1'bz;
+    17                                               //Temporary register declaration
+    18                                               reg [DW-1:0] OPA_1, OPB_1;
+    19                                               reg [DW-1:0] oprd1, oprd2;
+    20                                               reg [3:0] CMD_tmp;
+    21                                               reg [DW-1:0] AU_out_tmp1,AU_out_tmp2 ;
+    22                                               
+    23              1                        309     always @ (posedge CLK) begin
+    24                                                   if(RST) begin
+    25              1                          2             oprd1<=0;
+    26              1                          2             oprd2<=0;
+    27              1                          2             CMD_tmp<=0;
+    28                                                   end
+    29                                                   else if (INP_VALID==2'b01) begin
+    30              1                         65             oprd1<=OPA;
+    31              1                         65             CMD_tmp<=CMD;
+    32                                                   end
+    33                                                   else if (INP_VALID==2'b10) begin
+    34              1                         65             oprd2<=OPB;
+    35              1                         65             CMD_tmp<=CMD;
+    36                                                   end
+    37                                                   else if (INP_VALID==2'b11) begin
+    38              1                        149             oprd1<=OPA;
+    39              1                        149             oprd2<=OPB;
+    40              1                        149             CMD_tmp<=CMD;
+    41                                                   end
+    42                                                   else begin
+    43              1                         28             oprd1<=0;
+    44              1                         28             oprd2<=0;
+    45              1                         28             CMD_tmp<=0;
+    46                                                   end
+    47                                               end
+    48                                               
+    49              1                        309     always@(posedge CLK) begin
+    50                                                   if(CE) // If clock enable is active high then check for other control signals
+    51                                                   begin
+    52                                                       if(RST) // If reset is active high all output signals are equal to zero
+    53                                                       begin
+    54              1                    ***0***                 RES=9'bzzzzzzzzz;
+    55              1                    ***0***                 COUT=1'bz;
+    56              1                    ***0***                 OFLOW=1'bz;
+    57              1                    ***0***                 G=1'bz;
+    58              1                    ***0***                 E=1'bz;
+    59              1                    ***0***                 L=1'bz;
+    60              1                    ***0***                 ERR=1'bz;
+    61              1                    ***0***                 AU_out_tmp1=0;
+    62              1                    ***0***                 AU_out_tmp2=0;
+    63                                                       end
+    64                                                       else if(MODE) // Reset signal is active low. If MODE signal is high, then this is an Arithmetic Operation
+    65                                                       begin
+    66              1                        219                 RES=9'bzzzzzzzzz;
+    67              1                        219                 COUT=1'bz;
+    68              1                        219                 OFLOW=1'bz;
+    69              1                        219                 G=1'bz;
+    70              1                        219                 E=1'bz;
+    71              1                        219                 L=1'bz;
+    72              1                        219                 ERR=1'bz;
+    73                                                           case(CMD_tmp) // CMD_tmp is the binary code value of the Arithmetic Operation
+    74                                                               4'b0000: begin
+    75              1                         50                         RES=oprd1+oprd2;
+    76              1                         50                         COUT=RES[8]?1:0;
+    77                                                               end
+    78                                                               4'b0001 : begin
+    79              1                         14                         OFLOW=(oprd1<oprd2)?1:0;
+    80              1                         14                         RES=oprd1-oprd2;
+    81                                                               end
+    82                                                               4'h2: // CMD_tmp = 0010: ADD_CIN
+    83                                                               begin
+    84              1                         14                         RES=oprd1+oprd2+CIN;
+    85              1                         14                         COUT=RES[8]?1:0;
+    86                                                               end
+    87                                                               4'b0011: // CMD_tmp = 0011: SUB_CIN. Here we set the overflow flag
+    88                                                               begin
+    89              1                         16                         OFLOW=(oprd1<oprd2)?1:0;
+    90              1                         16                         RES=oprd1-oprd2-CIN;
+    91                                                               end
+    92              1                         19                     4'b0100:RES=oprd1; // CMD_tmp = 0100: INC_A //BUG_1 : incr +1 not happening
+    93              1                         12                     4'b0101:RES=oprd1-1; // CMD_tmp = 0101: DEC_A
+    94              1                          6                     4'b0110:RES=oprd2-1; // CMD_tmp = 0110: INC_B //BUG_2 : instead of incr its decr
+    95              1                         12                     4'b0111:RES=oprd2+1; // CMD_tmp = 0111: DEC_B //BUG_3 : instead of decr its incr
+    96                                                               4'b1000: // CMD_tmp = 1000: CMP
+    97                                                               begin
+    98              1                         32                         RES=9'bzzzzzzzzz;
+    99                                                                   if(oprd1==oprd2)
+    100                                                                  begin
+    101             1                          6                             E=1'b1;
+    102             1                          6                             G=1'bz;
+    103             1                          6                             L=1'bz;
+    104                                                                  end
+    105                                                                  else if(oprd1>oprd2)
+    106                                                                  begin
+    107             1                         16                             E=1'bz;
+    108             1                         16                             G=1'b1;
+    109             1                         16                             L=1'bz;
+    110                                                                  end
+    111                                                                  else
+    112                                                                  begin
+    113             1                         10                             E=1'bz;
+    114             1                         10                             G=1'bz;
+    115             1                         10                             L=1'b1;
+    116                                                                  end
+    117                                                              end
+    118                                                              4'b1001: begin //MP : oprd is incr and then multiplicationn ....3 cycle instruction/cmd
+    119             1                         24                         AU_out_tmp1 <= oprd1 + 1;
+    120             1                         24                         AU_out_tmp2 <= oprd2 + 1;
+    121             1                         24                         RES <=AU_out_tmp1 * AU_out_tmp2;
+    122                                                              end
+    123                                                              4'b1010: begin //MP : oprd_A is left shift and then mul with B ....3 cycle instruction/cmd
+    124             1                         20                         AU_out_tmp1 <= oprd1 << 1;
+    125             1                         20                         AU_out_tmp2 <= oprd2;
+    126             1                         20                         RES <=AU_out_tmp1 - AU_out_tmp2; //BUG_4 : instead of multiplication its substraction
+    127                                                              end
+    128                                                              default: // For any other case send high impedence value
+    129                                                              begin
+    130             1                    ***0***                         RES=9'bzzzzzzzzz;
+    131             1                    ***0***                         COUT=1'bz;
+    132             1                    ***0***                         OFLOW=1'bz;
+    133             1                    ***0***                         G=1'bz;
+    134             1                    ***0***                         E=1'bz;
+    135             1                    ***0***                         L=1'bz;
+    136             1                    ***0***                         ERR=1'bz;
+    137                                                              end
+    138                                                          endcase
+    139                                                      end
+    140                                                      else // MODE signal is low, then this is a Logical Operation
+    141                                                      begin
+    142             1                         84                 RES=9'bzzzzzzzzz;
+    143             1                         84                 COUT=1'bz;
+    144             1                         84                 OFLOW=1'bz;
+    145             1                         84                 G=1'bz;
+    146             1                         84                 E=1'bz;
+    147             1                         84                 L=1'bz;
+    148             1                         84                 ERR=1'bz;
+    149                                                          case(CMD_tmp) // CMD_tmp is the binary code value of the Logical Operation
+    150             1                          6                     4'b0000:RES={1'b0,oprd1&oprd2}; // CMD_tmp = 0000: AND
+    151             1                          6                     4'b0001:RES={1'b0,~(oprd1&oprd2)}; // CMD_tmp = 0001: NAND
+    152             1                          6                     4'b0010:RES={1'b0,oprd1&&oprd2}; // CMD_tmp = 0010: OR //BUG_5 : instead of OR its logical AND
+    153             1                          6                     4'b0011:RES={1'b0,~(oprd1|oprd2)}; // CMD_tmp = 0011: NOR
+    154             1                          6                     4'b0100:RES={1'b0,oprd1^oprd2}; // CMD_tmp = 0100: XOR
+    155             1                          6                     4'b0101:RES={1'b0,~(oprd1^oprd2)}; // CMD_tmp = 0101: XNOR
+    156             1                          6                     4'b0110:RES={1'b0,~oprd1}; // CMD_tmp = 0110: NOT_A
+    157             1                          6                     4'b0111:RES={1'b0,~oprd2}; // CMD_tmp = 0111: NOT_B
+    158             1                          6                     4'b1000:RES={1'b0,oprd1}; // CMD_tmp = 1000: SHR1_A // BUG_6 : no right shift
+    159             1                          6                     4'b1001:RES={1'b0,oprd1<<1}; // CMD_tmp = 1001: SHL1_A
+    160             1                          7                     4'b1010:RES={1'b0,oprd2<<1}; // CMD_tmp = 1010: SHR1_B //BUG_7 : instead of right shift its left shift
+    161             1                          6                     4'b1011:RES={1'b0,oprd2<<1}; // CMD_tmp = 1011: SHL1_B
+    162                                                              4'b1100: // CMD_tmp = 1100: ROL_A_B
+    163                                                              begin
+    164                                                                  // if operandB 0000_X000 : output is operandA
+    165                                                                  // if operandB 0000_X001 : output is operandA left rotate by 1
+    166                                                                  // if operandB 0000_X010 : output is operandA left rotate by 2
+    167                                                                  // if operandB 0000_X011 : output is operandA left rotate by 3
+    168                                                                  // if operandB 0000_X100 : output is operandA left rotate by 4
+    169                                                                  // if operandB 0000_X101 : output is operandA left rotate by 5
+    170                                                                  // if operandB 0000_X110 : output is operandA left rotate by 6
+    171                                                                  // if operandB 0000_X111 : output is operandA left rotate by 7
+    172                                                                  // if operandB [7:4] any bit is 1 then its error whereas output will be as per [2:0 as mentioned above]
+    173                                                                  if(oprd2[0])
+    174             1                    ***0***                             OPA_1 = {oprd1[6:0], oprd1[7]};
+    175                                                                  else
+    176             1                          6                             OPA_1 = oprd1;
+    177                                                                  if(oprd2[1])
+    178             1                          6                             OPB_1 = {OPA_1[5:0], OPA_1[7:6]};
+    179                                                                  else
+    180             1                    ***0***                             OPB_1= OPA_1;
+    181                                                                  if(oprd2[2])
+    182             1                          4                             RES = {OPB_1[3:0], OPB_1[7:4]} ;
+    183                                                                  else
+    184             1                          2                             RES = OPB_1;
+    185                                                                  if(oprd2[4] | oprd2[5] | oprd2[6] | oprd2[7])
+    186             1                          2                             ERR=1'b1;
+    187                                                              end
+    188                                                              4'b1101: // CMD_tmp = 1101: ROR_A_B
+    189                                                              begin
+    190                                                                  if(oprd2[0])
+    191             1                          5                             OPA_1 = {oprd1[0], oprd1[7:1]};
+    192                                                                  else
+    193             1                    ***0***                             OPA_1 = oprd1;
+    194                                                                  if(oprd2[1])
+    195             1                          4                             OPB_1 = {OPA_1[1:0], OPA_1[7:2]};
+    196                                                                  else
+    197             1                          1                             OPB_1= OPA_1;
+    198                                                                  if(oprd2[2])
+    199             1                          2                             RES = {OPB_1[3:0], OPB_1[7:4]} ;
+    200                                                                  else
+    201             1                          3                             RES = OPB_1;
+    202                                                                  if(oprd2[4] | oprd2[5] | oprd2[6] | oprd2[7])
+    203             1                          5                             ERR=1'b0; //BUG_8 : making error 0 instead of 1
+    204                                                              end
+    205                                                              default: // For any other case send high impedence value
+    206                                                              begin
+    207             1                    ***0***                         RES=9'bzzzzzzzzz;
+    208             1                    ***0***                         COUT=1'bz;
+    209             1                    ***0***                         OFLOW=1'bz;
+    210             1                    ***0***                         G=1'bz;
+    211             1                    ***0***                         E=1'bz;
+    212             1                    ***0***                         L=1'bz;
+    213             1                    ***0***                         ERR=1'bz;
+    214                                                              end
+    215                                                          endcase
+    216                                                      end
+    217                                                  end
+    218                                              end
+    219                                              endmodule
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        64        57         7      89.0
+
+================================Branch Details================================
+
+Branch Coverage for file alu.sv --
+
+------------------------------------IF Branch------------------------------------
+    24                                       309     Count coming in to IF
+    24              1                          2         if(RST) begin
+    29              1                         65         else if (INP_VALID==2'b01) begin
+    33              1                         65         else if (INP_VALID==2'b10) begin
+    37              1                        149         else if (INP_VALID==2'b11) begin
+    42              1                         28         else begin
+Branch totals: 5 hits of 5 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    50                                       309     Count coming in to IF
+    50              1                        303         if(CE) // If clock enable is active high then check for other control signals
+                                               6     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    52                                       303     Count coming in to IF
+    52              1                    ***0***             if(RST) // If reset is active high all output signals are equal to zero
+    64              1                        219             else if(MODE) // Reset signal is active low. If MODE signal is high, then this is an Arithmetic Operation
+    140             1                         84             else // MODE signal is low, then this is a Logical Operation
+Branch totals: 2 hits of 3 branches = 66.6%
+
+------------------------------------CASE Branch------------------------------------
+    73                                       219     Count coming in to CASE
+    74              1                         50                     4'b0000: begin
+    78              1                         14                     4'b0001 : begin
+    82              1                         14                     4'h2: // CMD_tmp = 0010: ADD_CIN
+    87              1                         16                     4'b0011: // CMD_tmp = 0011: SUB_CIN. Here we set the overflow flag
+    92              1                         19                     4'b0100:RES=oprd1; // CMD_tmp = 0100: INC_A //BUG_1 : incr +1 not happening
+    93              1                         12                     4'b0101:RES=oprd1-1; // CMD_tmp = 0101: DEC_A
+    94              1                          6                     4'b0110:RES=oprd2-1; // CMD_tmp = 0110: INC_B //BUG_2 : instead of incr its decr
+    95              1                         12                     4'b0111:RES=oprd2+1; // CMD_tmp = 0111: DEC_B //BUG_3 : instead of decr its incr
+    96              1                         32                     4'b1000: // CMD_tmp = 1000: CMP
+    118             1                         24                     4'b1001: begin //MP : oprd is incr and then multiplicationn ....3 cycle instruction/cmd
+    123             1                         20                     4'b1010: begin //MP : oprd_A is left shift and then mul with B ....3 cycle instruction/cmd
+    128             1                    ***0***                     default: // For any other case send high impedence value
+Branch totals: 11 hits of 12 branches = 91.6%
+
+------------------------------------IF Branch------------------------------------
+    76                                        50     Count coming in to IF
+    76              1                          6                         COUT=RES[8]?1:0;
+    76              2                         44                         COUT=RES[8]?1:0;
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    79                                        14     Count coming in to IF
+    79              1                          6                         OFLOW=(oprd1<oprd2)?1:0;
+    79              2                          8                         OFLOW=(oprd1<oprd2)?1:0;
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    85                                        14     Count coming in to IF
+    85              1                          6                         COUT=RES[8]?1:0;
+    85              2                          8                         COUT=RES[8]?1:0;
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    89                                        16     Count coming in to IF
+    89              1                          8                         OFLOW=(oprd1<oprd2)?1:0;
+    89              2                          8                         OFLOW=(oprd1<oprd2)?1:0;
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    99                                        32     Count coming in to IF
+    99              1                          6                         if(oprd1==oprd2)
+    105             1                         16                         else if(oprd1>oprd2)
+    111             1                         10                         else
+Branch totals: 3 hits of 3 branches = 100.0%
+
+------------------------------------CASE Branch------------------------------------
+    149                                       84     Count coming in to CASE
+    150             1                          6                     4'b0000:RES={1'b0,oprd1&oprd2}; // CMD_tmp = 0000: AND
+    151             1                          6                     4'b0001:RES={1'b0,~(oprd1&oprd2)}; // CMD_tmp = 0001: NAND
+    152             1                          6                     4'b0010:RES={1'b0,oprd1&&oprd2}; // CMD_tmp = 0010: OR //BUG_5 : instead of OR its logical AND
+    153             1                          6                     4'b0011:RES={1'b0,~(oprd1|oprd2)}; // CMD_tmp = 0011: NOR
+    154             1                          6                     4'b0100:RES={1'b0,oprd1^oprd2}; // CMD_tmp = 0100: XOR
+    155             1                          6                     4'b0101:RES={1'b0,~(oprd1^oprd2)}; // CMD_tmp = 0101: XNOR
+    156             1                          6                     4'b0110:RES={1'b0,~oprd1}; // CMD_tmp = 0110: NOT_A
+    157             1                          6                     4'b0111:RES={1'b0,~oprd2}; // CMD_tmp = 0111: NOT_B
+    158             1                          6                     4'b1000:RES={1'b0,oprd1}; // CMD_tmp = 1000: SHR1_A // BUG_6 : no right shift
+    159             1                          6                     4'b1001:RES={1'b0,oprd1<<1}; // CMD_tmp = 1001: SHL1_A
+    160             1                          7                     4'b1010:RES={1'b0,oprd2<<1}; // CMD_tmp = 1010: SHR1_B //BUG_7 : instead of right shift its left shift
+    161             1                          6                     4'b1011:RES={1'b0,oprd2<<1}; // CMD_tmp = 1011: SHL1_B
+    162             1                          6                     4'b1100: // CMD_tmp = 1100: ROL_A_B
+    188             1                          5                     4'b1101: // CMD_tmp = 1101: ROR_A_B
+    205             1                    ***0***                     default: // For any other case send high impedence value
+Branch totals: 14 hits of 15 branches = 93.3%
+
+------------------------------------IF Branch------------------------------------
+    173                                        6     Count coming in to IF
+    173             1                    ***0***                         if(oprd2[0])
+    175             1                          6                         else
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    177                                        6     Count coming in to IF
+    177             1                          6                         if(oprd2[1])
+    179             1                    ***0***                         else
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    181                                        6     Count coming in to IF
+    181             1                          4                         if(oprd2[2])
+    183             1                          2                         else
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    185                                        6     Count coming in to IF
+    185             1                          2                         if(oprd2[4] | oprd2[5] | oprd2[6] | oprd2[7])
+                                               4     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    190                                        5     Count coming in to IF
+    190             1                          5                         if(oprd2[0])
+    192             1                    ***0***                         else
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    194                                        5     Count coming in to IF
+    194             1                          4                         if(oprd2[1])
+    196             1                          1                         else
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    198                                        5     Count coming in to IF
+    198             1                          2                         if(oprd2[2])
+    200             1                          3                         else
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    202                                        5     Count coming in to IF
+    202             1                          5                         if(oprd2[4] | oprd2[5] | oprd2[6] | oprd2[7])
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              8         0         8       0.0
+
+================================Condition Details================================
+
+Condition Coverage for file alu.sv --
+
+----------------Focused Condition View-------------------
+Line       185 Item    1  (((oprd2[4] | oprd2[5]) | oprd2[6]) | oprd2[7])
+Condition totals: 0 of 4 input terms covered = 0.0%
+
+  Input Term   Covered  Reason for no coverage   Hint
+ -----------  --------  -----------------------  --------------
+    oprd2[4]         N  '_1' not hit             Hit '_1'
+    oprd2[5]         N  '_1' not hit             Hit '_1'
+    oprd2[6]         N  '_1' not hit             Hit '_1'
+    oprd2[7]         N  '_1' not hit             Hit '_1'
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  oprd2[4]_0            (~oprd2[7] && ~oprd2[6] && ~oprd2[5])
+  Row   2:    ***0***  oprd2[4]_1            (~oprd2[7] && ~oprd2[6] && ~oprd2[5])
+  Row   3:          1  oprd2[5]_0            (~oprd2[7] && ~oprd2[6] && ~oprd2[4])
+  Row   4:    ***0***  oprd2[5]_1            (~oprd2[7] && ~oprd2[6] && ~oprd2[4])
+  Row   5:          1  oprd2[6]_0            (~oprd2[7] && ~(oprd2[4] | oprd2[5]))
+  Row   6:    ***0***  oprd2[6]_1            (~oprd2[7] && ~(oprd2[4] | oprd2[5]))
+  Row   7:          1  oprd2[7]_0            ~((oprd2[4] | oprd2[5]) | oprd2[6])
+  Row   8:    ***0***  oprd2[7]_1            ~((oprd2[4] | oprd2[5]) | oprd2[6])
+
+----------------Focused Condition View-------------------
+Line       202 Item    1  (((oprd2[4] | oprd2[5]) | oprd2[6]) | oprd2[7])
+Condition totals: 0 of 4 input terms covered = 0.0%
+
+  Input Term   Covered  Reason for no coverage   Hint
+ -----------  --------  -----------------------  --------------
+    oprd2[4]         N  No hits                  Hit '_0' and '_1'
+    oprd2[5]         N  '_0' not hit             Hit '_0'
+    oprd2[6]         N  No hits                  Hit '_0' and '_1'
+    oprd2[7]         N  No hits                  Hit '_0' and '_1'
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:    ***0***  oprd2[4]_0            (~oprd2[7] && ~oprd2[6] && ~oprd2[5])
+  Row   2:    ***0***  oprd2[4]_1            (~oprd2[7] && ~oprd2[6] && ~oprd2[5])
+  Row   3:    ***0***  oprd2[5]_0            (~oprd2[7] && ~oprd2[6] && ~oprd2[4])
+  Row   4:          1  oprd2[5]_1            (~oprd2[7] && ~oprd2[6] && ~oprd2[4])
+  Row   5:    ***0***  oprd2[6]_0            (~oprd2[7] && ~(oprd2[4] | oprd2[5]))
+  Row   6:    ***0***  oprd2[6]_1            (~oprd2[7] && ~(oprd2[4] | oprd2[5]))
+  Row   7:    ***0***  oprd2[7]_0            ~((oprd2[4] | oprd2[5]) | oprd2[6])
+  Row   8:    ***0***  oprd2[7]_1            ~((oprd2[4] | oprd2[5]) | oprd2[6])
+
+
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                    190       185         5      97.3
+
+================================Toggle Details================================
+
+Toggle Coverage for File alu.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+         13                                      G           0           1       50.00 
+         14                                      E           0           1       50.00 
+         15                                      L           0           1       50.00 
+         18                               OPB_1[4]           0           1       50.00 
+         18                               OPA_1[1]           0           1       50.00 
+
+Total Node Count     =         95 
+Toggled Node Count   =         90 
+Untoggled Node Count =          5 
+
+Toggle Coverage      =       97.3% (185 of 190 bins)
+
+
+Total Coverage By File (code coverage only, filtered view): 65.4%
+
